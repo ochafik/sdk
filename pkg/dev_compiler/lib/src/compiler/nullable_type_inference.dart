@@ -10,6 +10,9 @@ import 'package:analyzer/dart/ast/visitor.dart' show RecursiveAstVisitor;
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'element_helpers.dart' show getStaticType, isInlineJS;
+import 'package:dev_compiler/src/nullability/escaping_locals.dart';
+import 'package:dev_compiler/src/nullability/flow_aware_nullability_inference.dart';
+import 'package:dev_compiler/src/nullability/knowledge.dart';
 import 'property_model.dart';
 
 /// An inference engine for nullable types.
@@ -33,10 +36,19 @@ abstract class NullableTypeInference {
   HashSet<LocalVariableElement> _notNullLocals;
 
   void inferNullableTypes(AstNode node) {
-    var visitor = new _NullableLocalInference(this);
-    node.accept(visitor);
-    _notNullLocals = visitor.computeNotNullLocals();
+    var staticInference = new _NullableLocalInference(this);
+    node.accept(staticInference);
+    _notNullLocals = staticInference.computeNotNullLocals();
+
+    // Comment these lines to disable the flow-aware nullability inference:
+    final localsToSkip = findLocalsMutatedInEscapingExecutableElements(node, isNullable);
+    flowAwareInference = new FlowAwareNullableLocalInference(localsToSkip,
+        isStaticallyNullable: isNullable,
+        hasPrimitiveType: (expr) => isPrimitiveType(getStaticType(expr)));
+    node.accept(flowAwareInference);
   }
+
+  FlowAwareNullableLocalInference flowAwareInference;
 
   /// Adds a new variable, typically a compiler generated temporary, and record
   /// whether its type is nullable.
@@ -54,6 +66,14 @@ abstract class NullableTypeInference {
   /// [_notNullLocals].
   bool _isNullable(Expression expr,
       [bool localIsNullable(LocalVariableElement e)]) {
+
+    if (flowAwareInference != null) {
+      final knowledge = flowAwareInference.getKnowledge(expr);
+      if (knowledge != null) {
+        return knowledge == Knowledge.isNullable;
+      }
+    }
+
     // TODO(jmesserly): we do recursive calls in a few places. This could
     // leads to O(depth) cost for calling this function. We could store the
     // resulting value if that becomes an issue, so we maintain the invariant
