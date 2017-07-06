@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'dart:io';
 /**
  *
  * - 1st pass with escape analysis to detect variables to skip
@@ -104,7 +103,6 @@ class FlowAwareNullableLocalInference
     } finally {
       popper?.pop();
     }
-    return result;
   }
 
   T _log<T>(String title, AstNode node, T f()) {
@@ -187,8 +185,8 @@ class FlowAwareNullableLocalInference
   Implications visitAssignmentExpression(AssignmentExpression node) {
     return _log('visitAssignmentExpression', node, () {
       final leftLocal = getValidLocal(node.leftHandSide);
-      final rightLocal = getValidLocal(node.rightHandSide);
-      final rightKnowledge = _getLocalKnowledge(rightLocal);
+      // final rightLocal = getValidLocal(node.rightHandSide);
+      // final rightKnowledge = _getLocalKnowledge(rightLocal);
 
       final rightImplications = node.rightHandSide.accept(this);
       return _withKnowledge(rightImplications?.getKnowledgeForNextOperation(),
@@ -323,9 +321,9 @@ class FlowAwareNullableLocalInference
             return _handleSequence([node.leftOperand, node.rightOperand]);
         }
       }
-      // node.visitChildren(this);
-      return Implications.then(
-          node.leftOperand.accept(this), node.rightOperand.accept(this));
+      // // node.visitChildren(this);
+      // return Implications.then(
+      //     node.leftOperand.accept(this), node.rightOperand.accept(this));
     });
   }
 
@@ -650,6 +648,7 @@ class FlowAwareNullableLocalInference
           var uri = e.source.uri;
           return uri.scheme == 'dart' && uri.path == '_js_helper';
         }
+        return false;
       default:
         return false;
     }
