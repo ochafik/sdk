@@ -291,6 +291,10 @@ class FlowAwareNullableLocalInference
             final leftImplications = node.leftOperand.accept(this);
             node.rightOperand.accept(this);
             return leftImplications;
+          case TokenType.AMPERSAND:
+          case TokenType.AMPERSAND_EQ:
+          case TokenType.BAR:
+          case TokenType.BAR_EQ:
           case TokenType.PLUS:
           case TokenType.PLUS_EQ:
           case TokenType.MINUS:
