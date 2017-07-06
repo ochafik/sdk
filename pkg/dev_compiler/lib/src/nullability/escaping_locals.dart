@@ -77,16 +77,14 @@ LocalElement getLocalVar(Expression expr) {
 }
 
 Set<LocalElement> findLocalsMutatedInEscapingExecutableElements(
-    AstNode node,
-    ExpressionPredicate isNullable) {
+    AstNode node, ExpressionPredicate isNullable) {
   final visitor = new _EscapingLocalMutationsVisitor(isNullable);
   node.accept(visitor);
   return visitor.localsMutatedInEscapingExecutableElements;
 }
 
 Set<LocalElement> findLocalsMutated(
-    AstNode node,
-    ExpressionPredicate isNullable) {
+    AstNode node, ExpressionPredicate isNullable) {
   final visitor = new _LocalMutationsVisitor(isNullable);
   node.accept(visitor);
   return visitor.localsMutated;

@@ -39,8 +39,14 @@ class FlowAwareNullableLocalInference
   final Set<LocalElement> localsToSkip;
   final ExpressionPredicate isStaticallyNullable;
   final ExpressionPredicate hasPrimitiveType;
+  final ExpressionPredicate hasNumberOrBooleanType;
+  final ExpressionPredicate hasStringType;
 
-  FlowAwareNullableLocalInference(this.localsToSkip, {this.isStaticallyNullable, this.hasPrimitiveType});
+  FlowAwareNullableLocalInference(this.localsToSkip,
+      {this.isStaticallyNullable,
+      this.hasPrimitiveType,
+      this.hasNumberOrBooleanType,
+      this.hasStringType});
 
   Knowledge getKnowledge(Expression id) {
     if (id is SimpleIdentifier) {
@@ -93,7 +99,9 @@ class FlowAwareNullableLocalInference
           .putIfAbsent(v, () => <Knowledge>[])
           .add(n == Knowledge.isNullable ? null : n);
     });
-    return knowledge == null ? null : new _KnowledgePopper(_stacks, knowledge.keys);
+    return knowledge == null
+        ? null
+        : new _KnowledgePopper(_stacks, knowledge.keys);
   }
 
   R _withKnowledge<R>(Map<LocalElement, Knowledge> knowledge, R f()) {
@@ -115,7 +123,6 @@ class FlowAwareNullableLocalInference
   Implications _handleSequence(List<AstNode> sequence,
       {Implications andThen(Implications implications),
       Implications getCustomImplications(int index, AstNode item)}) {
-
     final poppers = <_KnowledgePopper>[];
     Implications previousImplications;
 
@@ -129,7 +136,8 @@ class FlowAwareNullableLocalInference
         if (itemImplications != null) {
           previousImplications =
               Implications.then(previousImplications, itemImplications);
-          poppers.add(pushKnowledge(itemImplications?.getKnowledgeForNextOperation()));
+          poppers.add(
+              pushKnowledge(itemImplications?.getKnowledgeForNextOperation()));
         }
       }
       return andThen == null
@@ -193,7 +201,9 @@ class FlowAwareNullableLocalInference
           () {
         final leftImplications = node.leftHandSide.accept(this);
         final transferredImplications = new Implications({
-          leftLocal: isNullable(node.rightHandSide) ? Implication.isNull : Implication.isNotNull
+          leftLocal: isNullable(node.rightHandSide)
+              ? Implication.isNull
+              : Implication.isNotNull
         });
         // final transferredImplications = new Implications({
         //   leftLocal:
@@ -249,7 +259,8 @@ class FlowAwareNullableLocalInference
         // node.visitChildren(this);
         return handleNullComparison(
             node.rightOperand, rightLocal, node.operator);
-      } else if (leftLocal != null && rightLocal != null &&
+      } else if (leftLocal != null &&
+          rightLocal != null &&
           node.operator.type == TokenType.EQ_EQ) {
         node.visitChildren(this);
         // TODO: Upon equality, transfer knowledge between left<->right
@@ -312,13 +323,17 @@ class FlowAwareNullableLocalInference
           case TokenType.LT_EQ:
           case TokenType.LT_LT:
           case TokenType.LT_LT_EQ:
-            if (hasPrimitiveType(node.leftOperand)) {
+            if (hasNumberOrBooleanType(node.leftOperand)) {
               return Implications.then(
                   _handleSequence([node.leftOperand, node.rightOperand]),
                   new Implications({
                     leftLocal: Implication.isNotNull,
                     rightLocal: Implication.isNotNull
                   }));
+            } else if (hasStringType(node.leftOperand)) {
+              return Implications.then(
+                  _handleSequence([node.leftOperand, node.rightOperand]),
+                  new Implications({leftLocal: Implication.isNotNull}));
             }
             return _handleSequence([node.leftOperand, node.rightOperand]);
           default:
@@ -456,8 +471,10 @@ class FlowAwareNullableLocalInference
       FunctionExpressionInvocation node) {
     return _log('visitFunctionExpressionInvocation', node, () {
       // f(x.a, x.b) -> f(dart.notNull(x).a, x.b)
-      return _handleSequence([]..addAll(node.argumentList.arguments)..add(node.function),
-          andThen: (implications) {
+      return _handleSequence(
+          []
+            ..addAll(node.argumentList.arguments)
+            ..add(node.function), andThen: (implications) {
         final functionLocal = getValidLocal(node.function);
         if (functionLocal != null) {
           return Implications.then(implications,
@@ -668,7 +685,8 @@ class FlowAwareNullableLocalInference
         return new Implications({singleLocal: Implication.isNotNull});
       }
 
-      if (node.methodName.name == 'toString' && node.argumentList.arguments.isEmpty) {
+      if (node.methodName.name == 'toString' &&
+          node.argumentList.arguments.isEmpty) {
         return node.target?.accept(this);
       }
 
@@ -791,7 +809,8 @@ class FlowAwareNullableLocalInference
   @override
   Implications visitSimpleIdentifier(SimpleIdentifier node) {
     return _log('visitSimpleIdentifier', node, () {
-      if (node.parent is AssignmentExpression && node == node.parent.leftHandSide) {
+      if (node.parent is AssignmentExpression &&
+          node == node.parent.leftHandSide) {
         // Don't mark `x` in `x = y` as it's pointless / this saves up some time.
         return null;
       }
@@ -810,20 +829,24 @@ class FlowAwareNullableLocalInference
 
   @override
   Implications visitSwitchStatement(SwitchStatement node) {
-    return _log('visitSwitchStatement', node, () => _handleLoop(node, () {
-      final expressionLocal = getValidLocal(node.expression);
-      final expressionImplications = Implications.union(
-          node.expression.accept(this),
-          new Implications({expressionLocal: Implication.isNotNull}));
-      return _withKnowledge(expressionImplications?.getKnowledgeForNextOperation(), () {
-        // TODO: create all possible sequences of case members (incl.
-        // fallthroughs), then intersect their implications.
-        for (final member in node.members) {
-          member.accept(this);
-        }
-        return expressionImplications;
-      });
-    }));
+    return _log(
+        'visitSwitchStatement',
+        node,
+        () => _handleLoop(node, () {
+              final expressionLocal = getValidLocal(node.expression);
+              final expressionImplications = Implications.union(
+                  node.expression.accept(this),
+                  new Implications({expressionLocal: Implication.isNotNull}));
+              return _withKnowledge(
+                  expressionImplications?.getKnowledgeForNextOperation(), () {
+                // TODO: create all possible sequences of case members (incl.
+                // fallthroughs), then intersect their implications.
+                for (final member in node.members) {
+                  member.accept(this);
+                }
+                return expressionImplications;
+              });
+            }));
   }
 
   @override
@@ -844,14 +867,15 @@ class FlowAwareNullableLocalInference
   Implications visitTryStatement(TryStatement node) {
     return _log('visitTryStatement', node, () {
       final bodyImplications = node.body.accept(this);
-      final catchImplications = node.catchClauses.map((n) => n.accept(this)).toList();
+      final catchImplications =
+          node.catchClauses.map((n) => n.accept(this)).toList();
       final branches = [bodyImplications]..addAll(catchImplications);
       final intersectedImplications = branches.reduce(Implications.intersect);
       return _withKnowledge(
           intersectedImplications?.getKnowledgeForNextOperation(), () {
-            final finallyImplications = node.finallyBlock?.accept(this);
-            return Implications.then(intersectedImplications, finallyImplications);
-          });
+        final finallyImplications = node.finallyBlock?.accept(this);
+        return Implications.then(intersectedImplications, finallyImplications);
+      });
     });
   }
 

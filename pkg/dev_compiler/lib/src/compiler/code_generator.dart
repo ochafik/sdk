@@ -4127,6 +4127,9 @@ class CodeGenerator extends Object
   }
 
   bool isPrimitiveType(DartType t) => typeRep.isPrimitive(t);
+  bool isNumberOrBooleanType(DartType type) =>
+      typeRep.isNumber(type) || type == typeRep.types.boolType;
+  bool isStringType(DartType type) => type == typeRep.types.stringType;
 
   JS.Expression notNull(Expression expr) {
     if (expr == null) return null;

@@ -30,6 +30,8 @@ abstract class NullableTypeInference {
   VirtualFieldModel get virtualFields;
 
   bool isPrimitiveType(DartType type);
+  bool isNumberOrBooleanType(DartType type);
+  bool isStringType(DartType type);
   bool isObjectMember(String name);
 
   /// Known non-null local variables.
@@ -41,10 +43,14 @@ abstract class NullableTypeInference {
     _notNullLocals = staticInference.computeNotNullLocals();
 
     // Comment these lines to disable the flow-aware nullability inference:
-    final localsToSkip = findLocalsMutatedInEscapingExecutableElements(node, isNullable);
+    final localsToSkip =
+        findLocalsMutatedInEscapingExecutableElements(node, isNullable);
     flowAwareInference = new FlowAwareNullableLocalInference(localsToSkip,
         isStaticallyNullable: isNullable,
-        hasPrimitiveType: (expr) => isPrimitiveType(getStaticType(expr)));
+        hasPrimitiveType: (expr) => isPrimitiveType(getStaticType(expr)),
+        hasNumberOrBooleanType: (expr) =>
+            isNumberOrBooleanType(getStaticType(expr)),
+        hasStringType: (expr) => isStringType(getStaticType(expr)));
     node.accept(flowAwareInference);
   }
 
@@ -66,7 +72,6 @@ abstract class NullableTypeInference {
   /// [_notNullLocals].
   bool _isNullable(Expression expr,
       [bool localIsNullable(LocalVariableElement e)]) {
-
     if (flowAwareInference != null) {
       final knowledge = flowAwareInference.getKnowledge(expr);
       if (knowledge != null) {

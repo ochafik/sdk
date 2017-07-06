@@ -198,6 +198,23 @@ main() {
       ''');
       expect(
           await annotate('''
+        plus(String a, String b) { a + b; a; b; }
+        minux(String a, String b) { a - b; a; b; }
+        times(String a, String b) { a * b; a; b; }
+        divided(String a, String b) { a / b; a; b; }
+        and(String a, String b) { a & b; a; b; }
+        or(String a, String b) { a | b; a; b; }
+      '''),
+          '''
+        plus(String a, String b) { a + b; /*not-null*/a; b; }
+        minux(String a, String b) { a - b; /*not-null*/a; b; }
+        times(String a, String b) { a * b; /*not-null*/a; b; }
+        divided(String a, String b) { a / b; /*not-null*/a; b; }
+        and(String a, String b) { a & b; /*not-null*/a; b; }
+        or(String a, String b) { a | b; /*not-null*/a; b; }
+      ''');
+      expect(
+          await annotate('''
         String _truncate(String string, int start, int end, int length) {
           if (end - start > length) {
             end = start + length;
