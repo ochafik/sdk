@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:collection';
+import 'dart:io';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/standard_resolution_map.dart';
 import 'package:analyzer/dart/ast/token.dart' show TokenType;
@@ -43,15 +44,17 @@ abstract class NullableTypeInference {
     _notNullLocals = staticInference.computeNotNullLocals();
 
     // Comment these lines to disable the flow-aware nullability inference:
-    final localsToSkip =
-        findLocalsMutatedInEscapingExecutableElements(node, isNullable);
-    flowAwareInference = new FlowAwareNullableLocalInference(localsToSkip,
-        isStaticallyNullable: isNullable,
-        hasPrimitiveType: (expr) => isPrimitiveType(getStaticType(expr)),
-        hasNumberOrBooleanType: (expr) =>
-            isNumberOrBooleanType(getStaticType(expr)),
-        hasStringType: (expr) => isStringType(getStaticType(expr)));
-    node.accept(flowAwareInference);
+    if (new bool.fromEnvironment('FLOW_AWARE_NULLABILITY')) {
+      final localsToSkip =
+          findLocalsMutatedInEscapingExecutableElements(node, isNullable);
+      flowAwareInference = new FlowAwareNullableLocalInference(localsToSkip,
+          isStaticallyNullable: isNullable,
+          hasPrimitiveType: (expr) => isPrimitiveType(getStaticType(expr)),
+          hasNumberOrBooleanType: (expr) =>
+              isNumberOrBooleanType(getStaticType(expr)),
+          hasStringType: (expr) => isStringType(getStaticType(expr)));
+      node.accept(flowAwareInference);
+    }
   }
 
   FlowAwareNullableLocalInference flowAwareInference;
